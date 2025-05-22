@@ -68,7 +68,7 @@ def get_match(
     Returns:
         text that matches
     """
-    p = re.compile(pattern, re.DOTALL | re.IGNORECASE)
+    p = re.compile(pattern, re.DOTALL | re.IGNORECASE | re.MULTILINE)
     match = p.search(text)
 
     if not match:
@@ -111,6 +111,64 @@ def get_birth_date(name: str) -> str:
 
     return match.group("birth")
 
+# calling code
+
+def get_birth_place(name: str) -> str:
+    """Gets the birth place of the given person
+
+    Args:
+        name - name of the person
+
+    Returns:
+        birth place of the given person
+    """
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(name)))
+    
+    # Updated pattern to capture the birth place in the form of "City, State, Country"
+    pattern = r"born.*?([A-Za-z\s]+, [A-Za-z]+, U\.S\.)"
+    
+    error_text = "Page infobox has no birth place information in the expected format"
+    
+    match = get_match(infobox_text, pattern, error_text)
+    
+    return match.group(1).strip()
+
+def get_capital(country_name: str) -> str:
+    """Gets the capital of a given country from Wikipedia and prints the extracted infobox for debugging.
+
+    Args:
+        country_name - name of the country
+
+    Returns:
+        Capital city of the given country
+    """
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(country_name)))
+
+    # Regex pattern to extract the capital city
+    pattern = r"Capital(?:\s*(?:and largest city)?)(?P<capital>[A-Za-z\s'(),\-\.]+)(?=\s*[0-9]|\s*\[|$)"
+    error_text = "Page infobox has no capital information"
+    match = get_match(infobox_text, pattern, error_text)
+    return match.group("capital")
+
+def get_mean_density(planet_name: str) -> str:
+    """Gets the mean density of the given planet from its Wikipedia page
+
+    Args:
+        planet_name - name of the planet to get density of
+
+    Returns:
+        mean density of the given planet
+    """
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(planet_name)))
+
+    # Regex pattern to match mean density in the form: "Density: 5.51 g/cm³" or similar
+    pattern = r"(?i)(?:mean\s*density|density)\s*[:\-]?\s*(?P<density>[0-9.]+(?:\s*g\/cm³)?)"
+
+    error_text = "Page infobox has no mean density information"
+    match = get_match(infobox_text, pattern, error_text)
+
+    return match.group("density").strip()
+
 
 # below are a set of actions. Each takes a list argument and returns a list of answers
 # according to the action and the argument. It is important that each function returns a
@@ -140,6 +198,38 @@ def polar_radius(matches: List[str]) -> List[str]:
     """
     return [get_polar_radius(matches[0])]
 
+def birth_place(matches: List[str]) -> List[str]:
+    """Returns birth place of named person in matches
+
+    Args:
+        matches - match from pattern of person's name to find birth place of
+
+    Returns:
+        birth place of named person
+    """
+    return [get_birth_place(" ".join(matches))]
+
+def capital(matches: List[str]) -> List[str]:
+    """Returns the capital of the given country.
+
+    Args:
+        matches - match from pattern for country to find capital of
+
+    Returns:
+        Capital city of the country
+    """
+    return [get_capital(" ".join(matches))]
+
+def mean_density(matches: List[str]) -> List[str]:
+    """Returns mean density of planet in matches
+
+    Args:
+        matches - match from pattern of planet to find mean density of
+
+    Returns:
+        mean density of planet
+    """
+    return [get_mean_density(matches[0])]  # This calls get_mean_density and returns the result
 
 # dummy argument is ignored and doesn't matter
 def bye_action(dummy: List[str]) -> None:
@@ -156,12 +246,15 @@ Action = Callable[[List[str]], List[Any]]
 pa_list: List[Tuple[Pattern, Action]] = [
     ("when was % born".split(), birth_date),
     ("what is the polar radius of %".split(), polar_radius),
+    ("where was % born".split(), birth_place),
+    ("what is the capital of %".split(), capital),
+    ("what is the mean density of %".split(), mean_density),
     (["bye"], bye_action),
 ]
 
 
 def search_pa_list(src: List[str]) -> List[str]:
-    """Takes source, finds matching pattern and calls corresponding action. If it finds
+    """Takes source, finds matching pattern and calls cwhorresponding action. If it finds
     a match but has no answers it returns ["No answers"]. If it finds no match it
     returns ["I don't understand"].
 
